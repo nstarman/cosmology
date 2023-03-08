@@ -23,6 +23,7 @@
   ]
   dependencies = [
     "cosmology.api @ git+https://github.com/python-cosmology/cosmology-api.git",
+    "numpy>=1.21",
   ]
 
 [project.optional-dependencies]
@@ -93,9 +94,11 @@
   ]
 
 [tool.mypy]
+  python_version = 3.9
+
   namespace_packages = true
   explicit_package_bases = true
-  python_version = 3.9
+  mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 
   strict = true
   disallow_subclassing_any = false
@@ -105,11 +108,19 @@
   warn_redundant_casts = true
   warn_unused_configs = true
   warn_unreachable = true
-  exclude = '''(^|/)tests/'''
+  exclude = '''(^|/)tests/|(^/)docs/'''
 
   [[tool.mypy.overrides]]
     module = "tests/*"
     ignore_errors = true
+
+  [[tool.mypy.overrides]]
+    module = "docs/*"
+    ignore_errors = true
+
+  [[tool.mypy.overrides]]
+    module = "tomli.*"
+    ignore_missing_imports = true
 
   [[tool.mypy.overrides]]
     module="cosmology.api.*"
