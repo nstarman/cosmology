@@ -6,8 +6,12 @@ import functools
 import operator
 from typing import TYPE_CHECKING, cast
 
-from cosmology.coordinates.core._array_namespace import broadcast_to, equal, not_equal
-from cosmology.coordinates.core._core._core import BaseCoordinate
+from cosmology.coordinates.representation._base._base import CoordinateRepresentation
+from cosmology.coordinates.representation.array_namespace import (
+    broadcast_to,
+    equal,
+    not_equal,
+)
 
 __all__: list[str] = []
 
@@ -15,12 +19,12 @@ if TYPE_CHECKING:
     from cosmology.api._array_api import ArrayT
 
 
-@broadcast_to.register(BaseCoordinate)
+@broadcast_to.register(CoordinateRepresentation)
 def _broadcast_to(
-    x: BaseCoordinate[ArrayT],
+    x: CoordinateRepresentation[ArrayT],
     /,
     shape: tuple[int, ...],
-) -> BaseCoordinate[ArrayT]:
+) -> CoordinateRepresentation[ArrayT]:
     """Broadcasts an array to a specified shape.
 
     Parameters
@@ -41,12 +45,16 @@ def _broadcast_to(
     xp = x.__field_array_namespace__()
 
     return x.__class__(
-        **{n: xp.broadcast_to(getattr(x, n), shape) for n in x.array_fields},
+        **{n: xp.broadcast_to(getattr(x, n), shape) for n in x.coordinate_fields},
     )
 
 
-@equal.register(BaseCoordinate)
-def _equal(x1: BaseCoordinate[ArrayT], x2: BaseCoordinate[ArrayT], /) -> ArrayT:
+@equal.register(CoordinateRepresentation)
+def _equal(
+    x1: CoordinateRepresentation[ArrayT],
+    x2: CoordinateRepresentation[ArrayT],
+    /,
+) -> ArrayT:
     r"""Equality.
 
     Computes the truth value of ``x1_i == x2_i`` for each element ``x1_i`` of
@@ -74,13 +82,17 @@ def _equal(x1: BaseCoordinate[ArrayT], x2: BaseCoordinate[ArrayT], /) -> ArrayT:
         "ArrayT",
         functools.reduce(
             operator.and_,
-            (getattr(x1, n) == getattr(x2, n) for n in x2.array_fields),
+            (getattr(x1, n) == getattr(x2, n) for n in x2.coordinate_fields),
         ),
     )
 
 
-@not_equal.register(BaseCoordinate)
-def _not_equal(x1: BaseCoordinate[ArrayT], x2: BaseCoordinate[ArrayT], /) -> ArrayT:
+@not_equal.register(CoordinateRepresentation)
+def _not_equal(
+    x1: CoordinateRepresentation[ArrayT],
+    x2: CoordinateRepresentation[ArrayT],
+    /,
+) -> ArrayT:
     r"""Inequality.
 
     Computes the truth value of ``x1_i != x2_i`` for each element ``x1_i`` of
@@ -108,6 +120,6 @@ def _not_equal(x1: BaseCoordinate[ArrayT], x2: BaseCoordinate[ArrayT], /) -> Arr
         "ArrayT",
         functools.reduce(
             operator.and_,
-            (getattr(x1, n) != getattr(x2, n) for n in x2.array_fields),
+            (getattr(x1, n) != getattr(x2, n) for n in x2.coordinate_fields),
         ),
     )

@@ -137,6 +137,7 @@ ignore = [
   "ARG001", "ARG002",
   "D105", "D107", "D203", "D213",
   "FBT003",
+  "COM812",  # trailing comma missing
   "PD",
   "RET505", "RET506", "RET507",
 ]

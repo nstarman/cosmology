@@ -9,15 +9,14 @@ __all__: list[str] = []
 
 if TYPE_CHECKING:
     from cosmology.api._array_api import ArrayT
-
-    from .. import AbstractCoordinate  # noqa: TID252
+    from cosmology.coordinates.api import ArrayCoordinateRepresentation
 
 
 @singledispatch
 def equal(
-    x1: AbstractCoordinate[ArrayT],
-    x2: AbstractCoordinate[ArrayT],
-) -> AbstractCoordinate[ArrayT]:
+    x1: ArrayCoordinateRepresentation[ArrayT],
+    x2: ArrayCoordinateRepresentation[ArrayT],
+) -> ArrayCoordinateRepresentation[ArrayT]:
     r"""Equality.
 
     Computes the truth value of ``x1_i == x2_i`` for each element ``x1_i`` of
@@ -43,9 +42,9 @@ def equal(
 
 @singledispatch
 def not_equal(
-    x1: AbstractCoordinate[ArrayT],
-    x2: AbstractCoordinate[ArrayT],
-) -> AbstractCoordinate[ArrayT]:
+    x1: ArrayCoordinateRepresentation[ArrayT],
+    x2: ArrayCoordinateRepresentation[ArrayT],
+) -> ArrayCoordinateRepresentation[ArrayT]:
     r"""Inequality.
 
     Computes the truth value of ``x1_i != x2_i`` for each element ``x1_i`` of

@@ -3,26 +3,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import TYPE_CHECKING, Any, Callable, NoReturn, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 from cosmology.api._array_api import ArrayT
-from cosmology.coordinates.core._array_namespace._utils import get_namespace
-from cosmology.coordinates.core._base import AbstractCoordinate
-from cosmology.coordinates.core._transformations import represent_as
+from cosmology.coordinates.api.representation._base import ArrayCoordinateRepresentation
+from cosmology.coordinates.representation import array_namespace
+from cosmology.coordinates.representation._transformations import (
+    to_coordinate_representation,
+)
+from cosmology.coordinates.representation.array_namespace._utils import (
+    get_fields_namespace,
+)
 
 __all__: list[str] = []
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from cosmology.coordinates.api.representation._transformations import (
+        CoordinateRepresentationTransformationRegistry,
+    )
     from numpy.typing import NDArray  # noqa: TCH004, RUF100
 
 
-CrdT = TypeVar("CrdT", bound="BaseCoordinate[ArrayT]")  # type: ignore[valid-type]
+CrdT = TypeVar("CrdT", bound="CoordinateRepresentation[ArrayT]")  # type: ignore[valid-type]  # noqa: E501
 
 
 @dataclass(frozen=True, eq=False)
-class BaseCoordinate(AbstractCoordinate[ArrayT]):
+class CoordinateRepresentation(ArrayCoordinateRepresentation[ArrayT]):
     """Base class for cosmology representations.
 
     Parameters
@@ -32,10 +40,10 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
     """
 
     def __post_init__(self) -> None:
-        self._array_fields_: tuple[str, ...]
+        self._coordinate_fields_: tuple[str, ...]
         object.__setattr__(
             self,
-            "_array_fields_",
+            "_coordinate_fields_",
             tuple(
                 f.name
                 for f in fields(self)
@@ -46,56 +54,53 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
         # Broadcast the fields to a uniform shape.
         xp = self.__field_array_namespace__()
         arrs: tuple[ArrayT, ...] = xp.broadcast_arrays(
-            *(getattr(self, n) for n in self._array_fields_),
+            *(getattr(self, n) for n in self._coordinate_fields_),
         )
-        for n, arr in zip(self._array_fields_, arrs):
+        for n, arr in zip(self._coordinate_fields_, arrs):
             object.__setattr__(self, n, arr)
 
     @property
-    def array_fields(self) -> tuple[str, ...]:
+    def coordinate_fields(self) -> tuple[str, ...]:
         """The fields that are arrays."""
-        return self._array_fields_
+        return self._coordinate_fields_
 
-    def __field_array_namespace__(self, /, *, api_version: str | None = None) -> Any:
-        return get_namespace(
-            *(getattr(self, f) for f in self._array_fields_),
-            api_version=api_version,
-        )
-
-    def represent_as(self, representation_type: type[CrdT], /) -> CrdT:
-        """Represent as a different representation.
+    def to_coordinate_representation(
+        self,
+        representation_type: type[CrdT],
+        /,
+        *coordinates: CoordinateRepresentation[ArrayT],
+        representation_registry: CoordinateRepresentationTransformationRegistry[ArrayT]
+        | None = None,
+    ) -> CrdT:
+        """Return the coordinate in a new representation.
 
         Parameters
         ----------
         representation_type : type, positional-only
-            Representation class to transform to.
+            Coordinate class to transform to.
+
+        *coordinates : Coordinate, optional
+            Additional coordinates required to transform to the new
+            representation, e.g. differentials require a position coordinate.
+
+        representation_registry : CoordinateRepresentationTransformationRegistry, optional
+            Registry of representation transformations.
+            If `None` (default), use the default global registry.
 
         Returns
         -------
-        BaseRepresentation
-            Representation object of type ``representation_type``.
-        """
-        return cast("CrdT", represent_as(self, representation_type))
+        Coordinate
+            Coordinate object of type ``representation_type``.
+        """  # noqa: E501
+        return to_coordinate_representation(
+            self,
+            representation_type,
+            *coordinates,
+            representation_registry=representation_registry,
+        )
 
-    # ---------------------------
+    # =============================================================
     # Emulating container types
-
-    def __len__(self) -> int:
-        """Return the length of the coordinate.
-
-        The fields of the coordinate can have different lengths, but should
-        be broadcastable to a uniform shape. This method returns the length of
-        that broadcasted fields.
-
-        Returns
-        -------
-        int
-        """
-        return int(getattr(self, self._array_fields_[0]).shape[0])
-
-    def __iter__(self: CrdT) -> Iterator[CrdT]:
-        """Return an iterator over the coordinates."""
-        yield from (self[i] for i in range(len(self)))
 
     def __getitem__(self: CrdT, item: int | slice) -> CrdT:
         """Return a selection from the broadcasted Representation.
@@ -111,16 +116,40 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
             A new representation with the item applied to the fields.
         """
         return self.__class__(
-            **{f: getattr(self, f)[item] for f in self._array_fields_},
+            **{f: getattr(self, f)[item] for f in self.coordinate_fields},
+        )
+
+    def __len__(self) -> int:
+        """Return the length of the coordinate.
+
+        The fields of the coordinate can have different lengths, but should
+        be broadcastable to a uniform shape. This method returns the length of
+        that broadcasted fields.
+
+        Returns
+        -------
+        int
+        """
+        return int(getattr(self, self.coordinate_fields[0]).shape[0])
+
+    def __iter__(self: CrdT) -> Iterator[CrdT]:
+        """Return an iterator over the coordinates."""
+        yield from (self[i] for i in range(len(self)))
+
+    # =============================================================
+    # Coordinate Array-API Methods
+
+    def __field_array_namespace__(self, /, *, api_version: str | None = None) -> Any:
+        return get_fields_namespace(
+            *(getattr(self, f) for f in self._coordinate_fields_),
+            api_version=api_version,
         )
 
     # =============================================================
     # Array-API Methods
 
     def __array_namespace__(self, /, *, api_version: str | None = None) -> Any:
-        from cosmology.coordinates.core import _array_namespace
-
-        return _array_namespace
+        return array_namespace
 
     @property
     def ndim(self) -> int:
@@ -131,7 +160,7 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
         int
             The number of dimensions of the broadcasted representation.
         """
-        return int(getattr(self, self._array_fields_[0]).ndim)
+        return int(getattr(self, self.coordinate_fields[0]).ndim)
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -142,7 +171,7 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
         tuple[int, ...]
             The broadcasted shape of the representation.
         """
-        return cast(tuple[int, ...], getattr(self, self._array_fields_[0]).shape)
+        return cast(tuple[int, ...], getattr(self, self.coordinate_fields[0]).shape)
 
     @property
     def size(self) -> int:
@@ -153,40 +182,28 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
         int
             The size of the broadcasted representation.
         """
-        return int(getattr(self, self._array_fields_[0]).size)
+        return int(getattr(self, self.coordinate_fields[0]).size)
 
     # ========================================================================
     # Rich comparison
-
-    def __lt__(self, other: Any) -> NoReturn:
-        """Rich comparison operators are not implemented."""
-        raise NotImplementedError
-
-    def __le__(self, other: Any) -> NoReturn:
-        """Rich comparison operators are not implemented."""
-        raise NotImplementedError
 
     def __eq__(self, other: Any) -> Any:
         """Rich comparison operators are not implemented."""
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        return all(getattr(self, n) == getattr(other, n) for n in other.array_fields)
+        return all(
+            getattr(self, n) == getattr(other, n) for n in other.coordinate_fields
+        )
 
     def __ne__(self, other: Any) -> Any:
         """Rich comparison operators are not implemented."""
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        return all(getattr(self, n) != getattr(other, n) for n in other.array_fields)
-
-    def __gt__(self, other: Any) -> NoReturn:
-        """Rich comparison operators are not implemented."""
-        raise NotImplementedError
-
-    def __ge__(self, other: Any) -> NoReturn:
-        """Rich comparison operators are not implemented."""
-        raise NotImplementedError
+        return all(
+            getattr(self, n) != getattr(other, n) for n in other.coordinate_fields
+        )
 
     # ========================================================================
     # Numpy Compatibility Methods
@@ -197,17 +214,20 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
         Parameters
         ----------
         dtype : Any, optional
-            The dtype of the returned array. If not provided, the dtype is
-            inferred from the representation.
+            The dtype of each field of the returned array. If not provided, the
+            dtype is inferred from the representation.
 
         Returns
         -------
-        Any
-            Numpy array.
+        ndarray
+            structured Numpy array.
         """
         import numpy as np
 
-        dtype = [(f.name, np.dtype(getattr(self, f.name))) for f in fields(self)]
+        dtype = [
+            (f.name, dtype if dtype is not None else np.dtype(getattr(self, f.name)))
+            for f in fields(self)
+        ]
 
         out = np.empty(self.shape, dtype=dtype)
         for f in fields(self):
@@ -216,11 +236,7 @@ class BaseCoordinate(AbstractCoordinate[ArrayT]):
         return out
 
     def __array_ufunc__(
-        self,
-        ufunc: Callable[..., Any],
-        method: str,
-        *inputs: Any,
-        **kwargs: Any,
+        self, ufunc: Callable[..., Any], method: str, *inputs: Any, **kwargs: Any
     ) -> Any:
         """Return the result of the ufunc on the representation.
 

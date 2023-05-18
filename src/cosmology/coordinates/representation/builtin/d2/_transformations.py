@@ -1,7 +1,7 @@
 """The Cosmology coordinates library."""
 
 from cosmology.api._array_api import ArrayT
-from cosmology.coordinates.core._transformations import (
+from cosmology.coordinates.representation._transformations import (
     register_representation_transform,
 )
 

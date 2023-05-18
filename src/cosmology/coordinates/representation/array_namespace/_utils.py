@@ -7,7 +7,7 @@ __all__: list[str] = []
 ArrayAPINamespace = Any  # TODO: Replace with the type once the array API has this.
 
 
-def get_namespace(*xs: Any, api_version: str | None = None) -> ArrayAPINamespace:
+def get_fields_namespace(*xs: Any, api_version: str | None = None) -> ArrayAPINamespace:
     """Get the array API namespace for the given array inputs.
 
     Parameters

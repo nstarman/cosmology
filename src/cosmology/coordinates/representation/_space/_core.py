@@ -6,12 +6,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    NoReturn,
     TypeVar,
     overload,
 )
 
 from cosmology.api._array_api import ArrayT_co
-from cosmology.coordinates.core._base import AbstractCoordinate
+from cosmology.coordinates.api.representation._base import ArrayCoordinateRepresentation
 from numpy import broadcast_shapes
 
 __all__: list[str] = []
@@ -24,10 +25,14 @@ if TYPE_CHECKING:
 K = TypeVar("K")
 
 
-class CoordinateSpace(AbstractCoordinate[ArrayT_co], Generic[K, ArrayT_co]):
+class CoordinateSpace(ArrayCoordinateRepresentation[ArrayT_co], Generic[K, ArrayT_co]):
     """Cosmological coordinate space."""
 
-    def __init__(self, m: Mapping[K, AbstractCoordinate[ArrayT_co]], /) -> None:
+    def __init__(
+        self,
+        m: Mapping[K, ArrayCoordinateRepresentation[ArrayT_co]],
+        /,
+    ) -> None:
         # TODO! broadcast the coordinates to a uniform shape
         self._m = dict(m)
 
@@ -54,7 +59,11 @@ class CoordinateSpace(AbstractCoordinate[ArrayT_co], Generic[K, ArrayT_co]):
         """
         return self._m[self._k0].__field_array_namespace__(api_version=api_version)
 
-    def represent_as(self: CrdT, representation_type: type[CrdT], /) -> CrdT:
+    def to_coordinate_representation(
+        self: CrdT,
+        representation_type: type[CrdT],
+        /,
+    ) -> CrdT:
         """Return the coordinate in a new representation.
 
         Parameters
@@ -68,10 +77,13 @@ class CoordinateSpace(AbstractCoordinate[ArrayT_co], Generic[K, ArrayT_co]):
             Coordinate object of type ``representation_type``.
         """
         return self.__class__(
-            {k: v.represent_as(representation_type) for k, v in self._m.items()},
+            {
+                k: v.to_coordinate_representation(representation_type)
+                for k, v in self._m.items()
+            },
         )
 
-    def __iter__(self) -> Iterator[AbstractCoordinate[ArrayT_co]]:
+    def __iter__(self) -> Iterator[ArrayCoordinateRepresentation[ArrayT_co]]:
         """Return an iterator over the coordinates."""
         yield from (self[i] for i in range(len(self)))
 
@@ -96,10 +108,13 @@ class CoordinateSpace(AbstractCoordinate[ArrayT_co], Generic[K, ArrayT_co]):
         ...
 
     @overload
-    def __getitem__(self, key: K) -> AbstractCoordinate[ArrayT_co]:
+    def __getitem__(self, key: K) -> ArrayCoordinateRepresentation[ArrayT_co]:
         ...
 
-    def __getitem__(self, key: K | int | slice) -> AbstractCoordinate[ArrayT_co]:
+    def __getitem__(
+        self,
+        key: K | int | slice,
+    ) -> ArrayCoordinateRepresentation[ArrayT_co]:
         """Return a selection from the broadcasted Representation.
 
         Parameters
@@ -123,15 +138,28 @@ class CoordinateSpace(AbstractCoordinate[ArrayT_co], Generic[K, ArrayT_co]):
     # Mapping Methods
     # Getitem is overloaded above.
 
+    def __setitem__(
+        self,
+        key: K,
+        value: ArrayCoordinateRepresentation[ArrayT_co],
+        /,
+    ) -> NoReturn:
+        """Set the value of a field."""
+        raise NotImplementedError
+
+    def __delitem__(self, key: K, /) -> NoReturn:
+        """Delete a field."""
+        raise NotImplementedError
+
     def keys(self) -> KeysView[K]:
         """Return an iterator over the keys."""
         return self._m.keys()
 
-    def values(self) -> ValuesView[AbstractCoordinate[ArrayT_co]]:
+    def values(self) -> ValuesView[ArrayCoordinateRepresentation[ArrayT_co]]:
         """Return an iterator over the values."""
         return self._m.values()
 
-    def items(self) -> ItemsView[K, AbstractCoordinate[ArrayT_co]]:
+    def items(self) -> ItemsView[K, ArrayCoordinateRepresentation[ArrayT_co]]:
         """Return an iterator over the items."""
         return self._m.items()
 

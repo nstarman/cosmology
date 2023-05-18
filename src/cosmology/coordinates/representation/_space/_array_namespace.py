@@ -6,8 +6,12 @@ import functools
 import operator
 from typing import TYPE_CHECKING, TypeVar, cast
 
-from cosmology.coordinates.core._array_namespace import broadcast_to, equal, not_equal
-from cosmology.coordinates.core._space._core import CoordinateSpace
+from cosmology.coordinates.representation._space._core import CoordinateSpace
+from cosmology.coordinates.representation.array_namespace import (
+    broadcast_to,
+    equal,
+    not_equal,
+)
 
 __all__: list[str] = []
 

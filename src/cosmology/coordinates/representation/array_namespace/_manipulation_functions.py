@@ -9,12 +9,15 @@ __all__: list[str] = []
 
 if TYPE_CHECKING:
     from cosmology.api._array_api import ArrayT
-
-    from .. import AbstractCoordinate  # noqa: TID252
+    from cosmology.coordinates.api._base import ArrayCoordinateRepresentation
 
 
 @singledispatch
-def broadcast_to(x: Any, /, shape: tuple[int, ...]) -> AbstractCoordinate[ArrayT]:
+def broadcast_to(
+    x: Any,
+    /,
+    shape: tuple[int, ...],
+) -> ArrayCoordinateRepresentation[ArrayT]:
     """Broadcasts an array to a specified shape.
 
     Parameters
